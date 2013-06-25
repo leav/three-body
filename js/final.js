@@ -8,7 +8,7 @@ var camera, scene, renderer, stats;
 var cameraControls;
 var clock = new THREE.Clock();
 
-var stars;
+var starStates;
 var stellarViewMeshes;
 var stellarViewTrails;
 
@@ -63,9 +63,9 @@ function fillScene() {
   scene.add( directionalLight );
   
   // stars
-
-  stars = createStableStarSystem();
-  stellarViewMeshes = createStarMeshes(stars);
+  starStates = new StarStates();
+  starStates.stars = createStableStarSystem();
+  stellarViewMeshes = createStarMeshes(starStates.stars);
   for (var i = 0; i < stellarViewMeshes.length; i++)
     scene.add(stellarViewMeshes[i]);
  
@@ -94,7 +94,7 @@ function fillScene() {
 ////////////////////////////////////////////////////////////////////////////////
 
 	effectController = {
-		speed: 20,
+		speed: 0,
     trail: 300
 	};
   
@@ -112,7 +112,7 @@ function setupGui() {
 ////////////////////////////////////////////////////////////////////////////////
 var MAX_STAR_MASS = 1000;
 var INNER_STAR_ORBIT = 200;
-var OUTTER_STAR_ORBIT = 500;
+var OUTTER_STAR_ORBIT = 1000;
 var PLATNET_ORBIT = 100;
 var MIN_ORBIT_FACTOR = 0.8;
 var MAX_ORBIT_FACTOR = 1.2;
@@ -204,69 +204,6 @@ function centerOfPositions(stars) {
   return center;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Star class //
-////////////////////////////////////////////////////////////////////////////////
-
-var STAR_POSITION_RANGE = [-100, 100];
-var STAR_VELOCITY_RANGE = [-10, 10];
-var STAR_MASS_RANGE = [500, 1000];
-
-function Star(){
-  this.mass =  this.mass || 1;
-  this.position = this.position || new THREE.Vector3();
-  this.velocity = this.velocity || new THREE.Vector3();
-  this.acc = this.acc || new THREE.Vector3();
-}
-
-Star.prototype.toString = function(){
-  var string = "<Star> mass = " + this.mass.toFixed(2) +
-    " position = [" + this.position.x.toFixed(2) + ", " + this.position.y.toFixed(2) + ", " + this.position.z.toFixed(2) +
-    "] velocity = [" + this.velocity.x.toFixed(2) + ", " + this.velocity.y.toFixed(2) + ", " + this.velocity.z.toFixed(2) + "]";
-  return string;
-}
-
-Star.prototype.randProperties = function(){
-  this.randPosition();
-  this.randMass();
-  this.randVelocity();
-  return this;
-}
-
-Star.prototype.randPosition = function(){
-  this.position.copy(
-    randVector3(STAR_POSITION_RANGE[0], STAR_POSITION_RANGE[1])
-  );
-}
-
-Star.prototype.randMass = function(){
-  this.mass = randRange(STAR_MASS_RANGE[0], STAR_MASS_RANGE[1]);
-}
-
-Star.prototype.randVelocity = function(){
-  this.velocity.copy(
-    randVector3(STAR_VELOCITY_RANGE[0], STAR_VELOCITY_RANGE[1])
-  );
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Star.orbitAround
-// set the position and velocity of self to orbit around another star
-// the star argument needs to have a mass, velocity, position
-// orbitAxis default to be x axis
-////////////////////////////////////////////////////////////////////////////////
-
-Star.prototype.orbitAround = function(star, orbitRadius, orbitAxis){
-  orbitAxis = typeof orbitAxis !== 'undefined' ? orbitAxis : new THREE.Vector3(1, 0, 0);
-  var dist = getPerpendicular(orbitAxis);
-  dist.normalize();
-  dist.multiplyScalar(orbitRadius);
-  this.position.addVectors(star.position, dist);
-  this.velocity.crossVectors(orbitAxis, dist);
-  this.velocity.normalize();
-  this.velocity.multiplyScalar(Math.sqrt(GRAVITY_CONSTANT * star.mass / orbitRadius));
-  //this.velocity.add(star.velocity);
-}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -301,7 +238,7 @@ function updateStars(delta)
 {
   for (var i = 0; i < effectController.speed; i++)
   {
-    updateStarPhysics(delta);
+    starStates.updatePhysicsRK4(delta);
   }
 }
 
@@ -310,12 +247,11 @@ function updateStars(delta)
 ////////////////////////////////////////////////////////////////////////////////
 
 function updateStellarView(delta){
-  for (var i = 0; i < stars.length; i++)
+  for (var i = 0; i < starStates.stars.length; i++)
   {
-    stellarViewMeshes[i].position.copy(stars[i].position);
+    stellarViewMeshes[i].position.copy(starStates.stars[i].position);
     var pos = new THREE.Vector3();
-    pos.copy(stars[i].position);
-    pos.life = effectController.trail;
+    pos.copy(starStates.stars[i].position);
     stellarViewTrails[i].geometry.vertices.push(pos);
     // hack to dynamically add particles
     scene.remove(stellarViewTrails[i]);
@@ -329,127 +265,11 @@ function updateStellarView(delta){
     stellarViewTrails[i] = new THREE.ParticleSystem(geom, stellarViewTrails[i].material);
     scene.add(stellarViewTrails[i]);
   }
+  
+  //cameraControls.target.set(centerOfPositions(starStates.stars));
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// createTrailParticle
-////////////////////////////////////////////////////////////////////////////////
 
-var trailMaterial = new THREE.ParticleBasicMaterial( { sizeAttenuation: false } );
-function createTrailParticle(star){
-  var geometry = new THREE.Geometry()
-
-  //geometry.vertices.push( new THREE.Vector3(0, 0, 0) );
-  geometry.vertices.push( new THREE.Vector3(1, 0, 0) );
-  geometry.vertices.push( new THREE.Vector3(0, 1, 0) );
-  geometry.vertices.push( new THREE.Vector3(0, 0, 1) );
-
-  geometry.faces.push( new THREE.Face3( 0, 1, 2 ) );
-
-  var particle = new THREE.Mesh(
-      geometry,
-      trailMaterial );
-  particle.position.copy(star.position);
-  return particle;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// updateStarPhysics
-// calculate the forces and positions
-// using Euler's method, assuming the acceleration is constant over the delta time
-// new position = 0.5 * a * t^2 + v * t + old position
-// new velocity = a * t + old velocity
-// coding this simple formula is a pain in the ass because of THREE.js vector functions' side effects
-////////////////////////////////////////////////////////////////////////////////
-
-var GRAVITY_CONSTANT = 1;
-function updateStarPhysics(delta)
-{
-  var dist = new THREE.Vector3(); // distance vector between two stars
-  var temp = new THREE.Vector3();
-  for (var i = 0; i < stars.length; i++)
-  {
-    stars[i].acc.set(0, 0, 0);
-    for (var j = 0; j < stars.length; j++)
-    {
-      if (i == j)
-        break; // don't interact with self
-      dist.subVectors(stars[j].position, stars[i].position);
-      temp.copy(dist);
-      temp.normalize();
-      
-      stars[i].acc.add(
-        temp.multiplyScalar(GRAVITY_CONSTANT * stars[j].mass / dist.lengthSq())
-      );
-    }
-  }
-  for (var i = 0; i < stars.length; i++)
-  {
-    temp.copy(stars[i].acc);
-    stars[i].position.add(temp.multiplyScalar(0.5 * delta * delta));
-    temp.copy(stars[i].velocity);
-    stars[i].position.add(temp.multiplyScalar(delta));
-    temp.copy(stars[i].acc);
-    stars[i].velocity.add(temp.multiplyScalar(delta));
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// utils
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
-// log
-////////////////////////////////////////////////////////////////////////////////
-
-function log(msg) {
-    setTimeout(function() {
-        throw new Error(msg);
-    }, 0);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// randRange
-// returns a number between [min, max)
-////////////////////////////////////////////////////////////////////////////////
-
-function randRange(min, max)
-{
-  return Math.random() * (max - min) + min;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// randVector3
-// returns a Vector3 with randomized xyz
-////////////////////////////////////////////////////////////////////////////////
-
-function randVector3(min, max)
-{
-  return new THREE.Vector3(randRange(min, max), randRange(min, max), randRange(min, max));
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// addRandFactor
-////////////////////////////////////////////////////////////////////////////////
-
-THREE.Vector3.prototype.addRandFactor = function(factor)
-{
-  var range = this.length() * factor;
-  this.add(randVector3(-range, range));
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// get a perpendicular vector
-////////////////////////////////////////////////////////////////////////////////
-
-function getPerpendicular(vector)
-{
-  var result = new THREE.Vector3();
-  result.crossVectors(vector, new THREE.Vector3(0, 1, 0));
-  if (result.lengthSq() == 0)
-    result.crossVectors(vector, new THREE.Vector3(0, 0, 1)); // try a different axis
-  return result;
-}
 
 
 ////////////////////////////////////////////////////////////////////////////////
