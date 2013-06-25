@@ -10,6 +10,7 @@ var clock = new THREE.Clock();
 
 var stars;
 var stellarViewMeshes;
+var stellarViewTrails;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -31,8 +32,8 @@ function init() {
 	document.body.appendChild( renderer.domElement );
 
 	// CAMERA
-	camera = new THREE.PerspectiveCamera( 35, canvasWidth/ canvasHeight, 1, 4000 );
-	camera.position.set( 0, 2000, 0 );
+	camera = new THREE.PerspectiveCamera( 35, canvasWidth/ canvasHeight, 1, 8000 );
+	camera.position.set( 0, 4000, 0 );
 
 	// CONTROLS
 	cameraControls = new THREE.OrbitAndPanControls(camera, renderer.domElement);
@@ -67,7 +68,25 @@ function fillScene() {
   stellarViewMeshes = createStarMeshes(stars);
   for (var i = 0; i < stellarViewMeshes.length; i++)
     scene.add(stellarViewMeshes[i]);
-  
+ 
+  // particle system for the trails
+  // vertex colors
+  stellarViewTrails = [];
+  var material = new THREE.ParticleBasicMaterial( {
+      size: 10,
+      sizeAttenuation: true,
+      blending: THREE.NormalBlending,
+      transparent: false,
+      opacity: 1,
+      vertexColors: false
+  } ); 
+  for (var i = 0; i < stellarViewMeshes.length; i++)
+  {
+    var geometry = new THREE.Geometry();
+    geometry.colors = [];
+    stellarViewTrails[i] = new THREE.ParticleSystem( geometry, material, {dynamic : true});
+    scene.add(stellarViewTrails[i]);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -75,33 +94,56 @@ function fillScene() {
 ////////////////////////////////////////////////////////////////////////////////
 
 	effectController = {
-		speed: 50
+		speed: 20,
+    trail: 300
 	};
   
 function setupGui() {
 	var gui = new dat.GUI();
 
-	gui.add( effectController, "speed", 0.0, 100.0 ).step(1.0);
+	gui.add( effectController, "speed", 0.0, 1000.0 ).step(1.0);
+  gui.add( effectController, "trail", 0.0, 10000.0 ).step(1.0).name("trail (frame)");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // createStableStarSystem
 // returns a star array with three somewhat stable stars
+// star:planet mass ratio is about 3 * 10e5
 ////////////////////////////////////////////////////////////////////////////////
+var MAX_STAR_MASS = 1000;
+var INNER_STAR_ORBIT = 200;
+var OUTTER_STAR_ORBIT = 500;
+var PLATNET_ORBIT = 100;
+var MIN_ORBIT_FACTOR = 0.8;
+var MAX_ORBIT_FACTOR = 1.2;
+var PLANET_MASS = 0.001;
 
 function createStableStarSystem()
 {
   var array = [];
+  // double star
   array[0] = new Star();
-  array[0].randMass();
+  array[0].mass = randRange(MAX_STAR_MASS / 5, MAX_STAR_MASS);
   array[1] = new Star()
-  array[1].randMass();
-  array[1].orbitAround(array[0], randRange(50, 100), randVector3(1, 1));
+  array[1].mass = randRange(MAX_STAR_MASS / 5, MAX_STAR_MASS);
+  array[1].orbitAround(array[0], randRange(INNER_STAR_ORBIT * MIN_ORBIT_FACTOR, INNER_STAR_ORBIT * MAX_ORBIT_FACTOR), randVector3(-1, 1));
+  // third star at outer orbit
   var center = centerOfMass(array);
   array[2] = new Star()
-  array[2].randMass();
-  array[2].orbitAround(array[0], randRange(1000, 2000), randVector3(1, 1));
+  array[2].mass = randRange(MAX_STAR_MASS / 5, MAX_STAR_MASS);
+  array[2].orbitAround(center, randRange(OUTTER_STAR_ORBIT * MIN_ORBIT_FACTOR, OUTTER_STAR_ORBIT * MAX_ORBIT_FACTOR), randVector3(-1, 1));
+  // planet at third star
+  array[3] = new Star();
+  array[3].mass = PLANET_MASS
+  array[3].orbitAround(array[2], randRange(PLATNET_ORBIT * MIN_ORBIT_FACTOR, PLATNET_ORBIT * MAX_ORBIT_FACTOR), randVector3(-1, 1));
+  
+  //array[0].velocity = randVector3(-0.1, 0.1);
+  array[1].velocity.addRandFactor(0.2);
+  array[2].velocity.addRandFactor(0.2);
+  array[3].velocity.addRandFactor(0.2);
 
+  log("center mass " + center.toString());
+  log("3rd star " + array[2].toString());
   return array;
 }
 
@@ -110,6 +152,7 @@ function createStableStarSystem()
 // returns a mesh array for the stars
 ////////////////////////////////////////////////////////////////////////////////
 
+var MAX_STAR_SIZE = 20;
 var starMaterial = new THREE.MeshPhongMaterial( { shininess: 100 } );
 function createStarMeshes(stars)
 {
@@ -117,7 +160,7 @@ function createStarMeshes(stars)
   for (var i = 0; i < stars.length; i++)
   {
     meshes[i] = new THREE.Mesh(
-      new THREE.SphereGeometry( Math.max(Math.pow(stars[i].mass, 1/3), 1), 32, 16),
+      new THREE.SphereGeometry( Math.max(Math.pow(stars[i].mass / MAX_STAR_MASS, 1/3) * MAX_STAR_SIZE, 1), 32, 16),
       starMaterial );
   }
   return meshes;
@@ -148,7 +191,21 @@ function centerOfMass(stars) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Star class
+// centerOfPositions
+////////////////////////////////////////////////////////////////////////////////
+
+function centerOfPositions(stars) {
+  var center = new THREE.Vector3();
+  for (var i = 0; i < stars.length; i++)
+  {
+    center.add(stars[i].position);
+  }
+  center.divideScalar(stars.length);
+  return center;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Star class //
 ////////////////////////////////////////////////////////////////////////////////
 
 var STAR_POSITION_RANGE = [-100, 100];
@@ -160,6 +217,13 @@ function Star(){
   this.position = this.position || new THREE.Vector3();
   this.velocity = this.velocity || new THREE.Vector3();
   this.acc = this.acc || new THREE.Vector3();
+}
+
+Star.prototype.toString = function(){
+  var string = "<Star> mass = " + this.mass.toFixed(2) +
+    " position = [" + this.position.x.toFixed(2) + ", " + this.position.y.toFixed(2) + ", " + this.position.z.toFixed(2) +
+    "] velocity = [" + this.velocity.x.toFixed(2) + ", " + this.velocity.y.toFixed(2) + ", " + this.velocity.z.toFixed(2) + "]";
+  return string;
 }
 
 Star.prototype.randProperties = function(){
@@ -201,7 +265,7 @@ Star.prototype.orbitAround = function(star, orbitRadius, orbitAxis){
   this.velocity.crossVectors(orbitAxis, dist);
   this.velocity.normalize();
   this.velocity.multiplyScalar(Math.sqrt(GRAVITY_CONSTANT * star.mass / orbitRadius));
-  this.velocity.add(star.velocity);
+  //this.velocity.add(star.velocity);
 }
 
 
@@ -222,6 +286,7 @@ function render() {
 	var delta = Math.min(clock.getDelta(), 0.1); // set max delta
   
   updateStars(delta);
+  updateStellarView(delta);
   cameraControls.update(delta);
   stats.update();
   renderer.render(scene, camera);
@@ -238,10 +303,54 @@ function updateStars(delta)
   {
     updateStarPhysics(delta);
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// updateStellarView
+////////////////////////////////////////////////////////////////////////////////
+
+function updateStellarView(delta){
   for (var i = 0; i < stars.length; i++)
   {
     stellarViewMeshes[i].position.copy(stars[i].position);
+    var pos = new THREE.Vector3();
+    pos.copy(stars[i].position);
+    pos.life = effectController.trail;
+    stellarViewTrails[i].geometry.vertices.push(pos);
+    // hack to dynamically add particles
+    scene.remove(stellarViewTrails[i]);
+    var vertices = stellarViewTrails[i].geometry.vertices;
+    if (vertices.length > effectController.trail)
+    {
+      vertices.splice(0, vertices.length - effectController.trail);
+    }
+    var geom = new THREE.Geometry();
+    geom.vertices = vertices;
+    stellarViewTrails[i] = new THREE.ParticleSystem(geom, stellarViewTrails[i].material);
+    scene.add(stellarViewTrails[i]);
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// createTrailParticle
+////////////////////////////////////////////////////////////////////////////////
+
+var trailMaterial = new THREE.ParticleBasicMaterial( { sizeAttenuation: false } );
+function createTrailParticle(star){
+  var geometry = new THREE.Geometry()
+
+  //geometry.vertices.push( new THREE.Vector3(0, 0, 0) );
+  geometry.vertices.push( new THREE.Vector3(1, 0, 0) );
+  geometry.vertices.push( new THREE.Vector3(0, 1, 0) );
+  geometry.vertices.push( new THREE.Vector3(0, 0, 1) );
+
+  geometry.faces.push( new THREE.Face3( 0, 1, 2 ) );
+
+  var particle = new THREE.Mesh(
+      geometry,
+      trailMaterial );
+  particle.position.copy(star.position);
+  return particle;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -320,6 +429,16 @@ function randVector3(min, max)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// addRandFactor
+////////////////////////////////////////////////////////////////////////////////
+
+THREE.Vector3.prototype.addRandFactor = function(factor)
+{
+  var range = this.length() * factor;
+  this.add(randVector3(-range, range));
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // get a perpendicular vector
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -331,6 +450,7 @@ function getPerpendicular(vector)
     result.crossVectors(vector, new THREE.Vector3(0, 0, 1)); // try a different axis
   return result;
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // fire up the system
