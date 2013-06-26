@@ -12,6 +12,8 @@ var starStates;
 var stellarViewMeshes;
 var stellarViewTrails;
 
+var noiseUniforms;
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // init
@@ -153,10 +155,25 @@ function createStableStarSystem()
 ////////////////////////////////////////////////////////////////////////////////
 
 var MAX_STAR_SIZE = 20;
-var star_texture = THREE.ImageUtils.loadTexture( './textures/sun01_512.png' );
+var star_texture = THREE.ImageUtils.loadTexture( 'textures/sun01_512.png' );
 star_texture.wrapS = THREE.RepeatWrapping;
 star_texture.wrapT = THREE.RepeatWrapping;
-var star_material = new THREE.MeshBasicMaterial( { map: star_texture } );
+var noiseTexture = new THREE.ImageUtils.loadTexture( 'textures/cloud.png' );
+	noiseTexture.wrapS = noiseTexture.wrapT = THREE.RepeatWrapping; 
+noiseUniforms = {
+		baseTexture: 	{ type: "t", value: star_texture },
+		baseSpeed: 		{ type: "f", value: 0.05 },
+		noiseTexture: 	{ type: "t", value: noiseTexture },
+		noiseScale:		{ type: "f", value: 0.25 },
+		alpha: 			{ type: "f", value: 1.0 },
+		time: 			{ type: "f", value: 1.0 }
+	};
+var star_material = new THREE.ShaderMaterial( 
+	{
+	    uniforms: noiseUniforms,
+		vertexShader:   document.getElementById( 'vertexShader'   ).textContent,
+		fragmentShader: document.getElementById( 'noiseFragmentShader' ).textContent
+	}   );
 var planet_material = new THREE.MeshPhongMaterial( { shininess: 100 } );
 function createStarMeshes(stars)
 {
@@ -233,7 +250,8 @@ function updateStellarView(delta){
     stellarViewTrails[i] = new THREE.ParticleSystem(geom, stellarViewTrails[i].material);
     scene.add(stellarViewTrails[i]);
   }
-  star_texture.offset.add(new THREE.Vector2(0.001, 0.00) );
+  noiseUniforms.time.value += delta;
+  //star_texture.offset.add(new THREE.Vector2(0.001, 0.00) );
   //cameraControls.target.set(centerOfPositions(starStates.stars));
 }
 
