@@ -113,10 +113,10 @@ function setupGui() {
 var MAX_STAR_MASS = 1000;
 var INNER_STAR_ORBIT = 200;
 var OUTTER_STAR_ORBIT = 1000;
-var PLATNET_ORBIT = 100;
+var PLATNET_ORBIT = 200;
 var MIN_ORBIT_FACTOR = 0.8;
 var MAX_ORBIT_FACTOR = 1.2;
-var PLANET_MASS = 0.001;
+var PLANET_MASS = 0.000;
 
 function createStableStarSystem()
 {
@@ -133,7 +133,7 @@ function createStableStarSystem()
   array[2].mass = randRange(MAX_STAR_MASS / 5, MAX_STAR_MASS);
   array[2].orbitAround(center, randRange(OUTTER_STAR_ORBIT * MIN_ORBIT_FACTOR, OUTTER_STAR_ORBIT * MAX_ORBIT_FACTOR), randVector3(-1, 1));
   // planet at third star
-  array[3] = new Star();
+  array[3] = new Star({type: "planet"});
   array[3].mass = PLANET_MASS
   array[3].orbitAround(array[2], randRange(PLATNET_ORBIT * MIN_ORBIT_FACTOR, PLATNET_ORBIT * MAX_ORBIT_FACTOR), randVector3(-1, 1));
   
@@ -153,56 +153,24 @@ function createStableStarSystem()
 ////////////////////////////////////////////////////////////////////////////////
 
 var MAX_STAR_SIZE = 20;
-var starMaterial = new THREE.MeshPhongMaterial( { shininess: 100 } );
+var star_texture = THREE.ImageUtils.loadTexture( 'textures/sun01_512.png' );
+star_texture.wrapS = THREE.RepeatWrapping;
+star_texture.wrapT = THREE.RepeatWrapping;
+var star_material = new THREE.MeshBasicMaterial( { map: star_texture } );
+var planet_material = new THREE.MeshPhongMaterial( { shininess: 100 } );
 function createStarMeshes(stars)
 {
   var meshes = [];
   for (var i = 0; i < stars.length; i++)
   {
+    var radius = Math.max(Math.pow(stars[i].mass / MAX_STAR_MASS, 1/3) * MAX_STAR_SIZE, 1);
     meshes[i] = new THREE.Mesh(
-      new THREE.SphereGeometry( Math.max(Math.pow(stars[i].mass / MAX_STAR_MASS, 1/3) * MAX_STAR_SIZE, 1), 32, 16),
-      starMaterial );
+      new THREE.SphereGeometry(radius, 32, 16),
+      star_material );
   }
   return meshes;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// centerOfMass
-// returns a obejct with mass, position, velocity
-// essentially a star
-////////////////////////////////////////////////////////////////////////////////
-
-function centerOfMass(stars) {
-  var center = new Star();
-  var temp = new THREE.Vector3();
-  for (var i = 0; i < stars.length; i++)
-  {
-    center.mass += stars[i].mass;
-    temp.copy(stars[i].position);
-    temp.multiplyScalar(stars[i].mass);
-    center.position.add(temp);
-    temp.copy(stars[i].velocity);
-    temp.multiplyScalar(stars[i].mass);
-    center.velocity.add(temp);
-  }
-  center.position.divideScalar(center.mass);
-  center.velocity.divideScalar(center.mass);
-  return center;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// centerOfPositions
-////////////////////////////////////////////////////////////////////////////////
-
-function centerOfPositions(stars) {
-  var center = new THREE.Vector3();
-  for (var i = 0; i < stars.length; i++)
-  {
-    center.add(stars[i].position);
-  }
-  center.divideScalar(stars.length);
-  return center;
-}
 
 
 
@@ -265,7 +233,7 @@ function updateStellarView(delta){
     stellarViewTrails[i] = new THREE.ParticleSystem(geom, stellarViewTrails[i].material);
     scene.add(stellarViewTrails[i]);
   }
-  
+  star_texture.offset.add(new THREE.Vector2(0.001, 0.00) );
   //cameraControls.target.set(centerOfPositions(starStates.stars));
 }
 

@@ -7,6 +7,15 @@ function Star(){
   this.position = this.position || new THREE.Vector3();
   this.velocity = this.velocity || new THREE.Vector3();
   this.acc = this.acc || new THREE.Vector3();
+  this.type = this.type || "star";
+}
+
+Star.prototype.copy = function(other){
+  this.mass =  other.mass;
+  this.position.copy(other.position);
+  this.velocity.copy(other.velocity);
+  this.acc.copy(other.acc);
+  this.type =  other.type;
 }
 
 Star.prototype.toString = function(){
@@ -51,10 +60,7 @@ StarStates.prototype.copy = function(other){
   for (var i = 0; i < other.stars.length; i++)
   {
     this.stars[i] = new Star();
-    this.stars[i].mass = other.stars[i].mass;
-    this.stars[i].position.copy(other.stars[i].position);
-    this.stars[i].velocity.copy(other.stars[i].velocity);
-    this.stars[i].acc.copy(other.stars[i].acc);
+    this.stars[i].copy(other.stars[i]);
   }
 }
 
@@ -168,5 +174,42 @@ StarStates.prototype.updatePhysicsEuler = function(delta)
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// centerOfMass
+// returns a obejct with mass, position, velocity
+// essentially a star
+////////////////////////////////////////////////////////////////////////////////
+
+function centerOfMass(stars) {
+  var center = new Star();
+  var temp = new THREE.Vector3();
+  for (var i = 0; i < stars.length; i++)
+  {
+    center.mass += stars[i].mass;
+    temp.copy(stars[i].position);
+    temp.multiplyScalar(stars[i].mass);
+    center.position.add(temp);
+    temp.copy(stars[i].velocity);
+    temp.multiplyScalar(stars[i].mass);
+    center.velocity.add(temp);
+  }
+  center.position.divideScalar(center.mass);
+  center.velocity.divideScalar(center.mass);
+  return center;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// centerOfPositions
+////////////////////////////////////////////////////////////////////////////////
+
+function centerOfPositions(stars) {
+  var center = new THREE.Vector3();
+  for (var i = 0; i < stars.length; i++)
+  {
+    center.add(stars[i].position);
+  }
+  center.divideScalar(stars.length);
+  return center;
+}
 
 

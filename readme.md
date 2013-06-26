@@ -1,0 +1,2 @@
+To run the demo locally, please refer to this page. Otherwise, the security setting of the browser would not let you load the textures.
+[https://github.com/mrdoob/three.js/wiki/How-to-run-things-locally]
