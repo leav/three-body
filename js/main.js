@@ -153,7 +153,7 @@ function createStableStarSystem()
 ////////////////////////////////////////////////////////////////////////////////
 
 var MAX_STAR_SIZE = 20;
-var star_texture = THREE.ImageUtils.loadTexture( 'textures/sun01_512.png' );
+var star_texture = THREE.ImageUtils.loadTexture( './textures/sun01_512.png' );
 star_texture.wrapS = THREE.RepeatWrapping;
 star_texture.wrapT = THREE.RepeatWrapping;
 var star_material = new THREE.MeshBasicMaterial( { map: star_texture } );
