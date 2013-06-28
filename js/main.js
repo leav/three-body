@@ -9,8 +9,11 @@ var cameraControls;
 var clock = new THREE.Clock();
 
 var starStates;
+
 var stellarViewMeshes;
 var stellarViewTrails;
+var stellarDisplay;
+var spaceMesh;
 
 var noiseUniforms;
 
@@ -34,12 +37,9 @@ function init() {
 	document.body.appendChild( renderer.domElement );
 
 	// CAMERA
-	camera = new THREE.PerspectiveCamera( 35, canvasWidth/ canvasHeight, 1, 8000 );
-	camera.position.set( 0, 4000, 0 );
+	camera = new THREE.PerspectiveCamera( 35, canvasWidth/ canvasHeight, 1, 10000 );
+	camera.position.set( 0, 0, 4000 );
 
-	// CONTROLS
-	cameraControls = new THREE.OrbitAndPanControls(camera, renderer.domElement);
-	cameraControls.target.set(0,0,0);
 
 	// STATS
 	stats = new Stats();
@@ -48,6 +48,10 @@ function init() {
 	document.body.appendChild( stats.domElement );
 
 	fillScene();
+  
+	// CONTROLS
+	cameraControls = new THREE.OrbitControls(camera, stellarDisplay, renderer.domElement);
+  
   setupGui();
 }
 
@@ -57,7 +61,11 @@ function init() {
 
 function fillScene() {
 	scene = new THREE.Scene();
-
+  stellarDisplay = new THREE.RotationDisplay();
+  //stellarDisplay.add(new THREE.AxisIndicator(5, 1000));
+  scene.add(stellarDisplay);
+  
+  
 	// LIGHTS
 	scene.add( new THREE.AmbientLight( 0x222222 ) )
   var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
@@ -69,7 +77,7 @@ function fillScene() {
   starStates.stars = createStableStarSystem();
   stellarViewMeshes = createStarMeshes(starStates.stars);
   for (var i = 0; i < stellarViewMeshes.length; i++)
-    scene.add(stellarViewMeshes[i]);
+    stellarDisplay.addMesh(stellarViewMeshes[i]);
  
   // particle system for the trails
   // vertex colors
@@ -87,8 +95,35 @@ function fillScene() {
     var geometry = new THREE.Geometry();
     geometry.colors = [];
     stellarViewTrails[i] = new THREE.ParticleSystem( geometry, material, {dynamic : true});
-    scene.add(stellarViewTrails[i]);
+    //scene.add(stellarViewTrails[i]);
+    stellarDisplay.addMesh(stellarViewTrails[i]);
   }
+  
+  // sky box
+  // var imagePrefix = "textures/space";
+	// var directions  = ["1", "2", "3", "4", "5", "6"];
+	// var imageSuffix = ".png";
+	// var spaceGeometry = new THREE.CubeGeometry( 5000, 5000, 5000 );	
+	
+	// var materialArray = [];
+	// for (var i = 0; i < 6; i++)
+		// materialArray.push( new THREE.MeshBasicMaterial({
+			// map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			// side: THREE.BackSide
+		// }));
+	// var spaceMaterial = new THREE.MeshFaceMaterial( materialArray );
+	// var skyBox = new THREE.Mesh( spaceGeometry, spaceMaterial );
+	// stellarDisplay.addMesh( skyBox );  
+  
+  var spaceGeometry = new THREE.SphereGeometry(5000, 32, 16);
+  var spaceMaterial = new THREE.MeshBasicMaterial({
+			map: THREE.ImageUtils.loadTexture( "textures/space_sphere.png"),
+			side: THREE.BackSide
+		});
+  spaceMesh = new THREE.Mesh( spaceGeometry, spaceMaterial );
+  stellarDisplay.addMesh(spaceMesh);
+
+  
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -154,7 +189,7 @@ function createStableStarSystem()
 // returns a mesh array for the stars
 ////////////////////////////////////////////////////////////////////////////////
 
-var MAX_STAR_SIZE = 20;
+var MAX_STAR_SIZE = 50;
 var star_texture = THREE.ImageUtils.loadTexture( 'textures/sun01_512.png' );
 star_texture.wrapS = THREE.RepeatWrapping;
 star_texture.wrapT = THREE.RepeatWrapping;
@@ -206,9 +241,13 @@ function animate() {
 
 function render() {
 	var delta = Math.min(clock.getDelta(), 0.1); // set max delta
+  stellarDisplay.pivot.copy(centerOfPositions(starStates.stars));
+  stellarDisplay.update(delta);
+  spaceMesh.position.copy(stellarDisplay.pivot);
   
   updateStars(delta);
   updateStellarView(delta);
+  //cameraControls.target.copy(centerOfPositions(starStates.stars));
   cameraControls.update(delta);
   stats.update();
   renderer.render(scene, camera);
@@ -239,7 +278,8 @@ function updateStellarView(delta){
     pos.copy(starStates.stars[i].position);
     stellarViewTrails[i].geometry.vertices.push(pos);
     // hack to dynamically add particles
-    scene.remove(stellarViewTrails[i]);
+    //scene.remove(stellarViewTrails[i]);
+    stellarDisplay.removeMesh(stellarViewTrails[i]);
     var vertices = stellarViewTrails[i].geometry.vertices;
     if (vertices.length > effectController.trail)
     {
@@ -248,11 +288,12 @@ function updateStellarView(delta){
     var geom = new THREE.Geometry();
     geom.vertices = vertices;
     stellarViewTrails[i] = new THREE.ParticleSystem(geom, stellarViewTrails[i].material);
-    scene.add(stellarViewTrails[i]);
+    //scene.add(stellarViewTrails[i]);
+    stellarDisplay.addMesh(stellarViewTrails[i]);
   }
+  
   noiseUniforms.time.value += delta;
-  //star_texture.offset.add(new THREE.Vector2(0.001, 0.00) );
-  //cameraControls.target.set(centerOfPositions(starStates.stars));
+  star_texture.offset.add(new THREE.Vector2(0.005, 0.00) );
 }
 
 
