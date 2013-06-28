@@ -18,15 +18,15 @@ THREE.OrbitControls = function (camera, display, domElement){
   this.domElement = domElement;
   this.dollyDistance = this.dollyDistance || this.camera.position.z;
   this.target = new THREE.Vector3(0, 0, 0);
+  this.enabled = true;
 
   var rotateStart = new THREE.Vector2();
   var scope = this;
   
-
-  var xAxis = new THREE.Vector3(1, 0, 0);
   THREE.OrbitControls.prototype.update = function(delta){
+    if (this.maxDollyDistance)
+      this.dollyDistance = Math.min(this.maxDollyDistance, this.dollyDistance);
     this.camera.position.set(0, 0, this.dollyDistance);
-    //this.camera.lookAt(this.target);
   }
   
   var DOLLY_FACTOR = 1.05;
@@ -44,11 +44,15 @@ THREE.OrbitControls = function (camera, display, domElement){
     document.addEventListener( 'mouseup', onMouseUp, false );
   }
 
-  var ROTATE_FACTOR = 0.2; // how many degrees to rotate for each pixel the mouse moved
+  var ROTATE_FACTOR = 360; // how many degrees to rotate for each screen travelled
   function onMouseMove( event ) {
+    if (!scope.enabled)
+      return;
     var rotateEnd = new THREE.Vector2( event.clientX, event.clientY );
     var rotateDelta = new THREE.Vector2().subVectors(rotateEnd, rotateStart);
     rotateStart.copy(rotateEnd);
+    rotateDelta.x /= canvasWidth;
+    rotateDelta.y /= canvasHeight;
     rotateDelta.multiplyScalar(ROTATE_FACTOR * Math.PI / 180);
     scope.display.rotateXY(rotateDelta);
   }
@@ -63,6 +67,8 @@ THREE.OrbitControls = function (camera, display, domElement){
 		// this is needed when the program is inside an iframe
 		// to prevent scrolling the whole page
 		event.preventDefault();
+    if (!scope.enabled)
+      return;
 		var delta = 0;
 		if ( event.wheelDelta ) { // WebKit / Opera / Explorer 9
 			delta = event.wheelDelta;
