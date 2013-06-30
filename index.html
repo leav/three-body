@@ -8,32 +8,10 @@
   <body>
     <script src="lib/jquery-1.8.3.min.js"></script>
     <script src="lib/three.min.js"></script>
-    <script src="lib/Detector.js"></script>
-    <script src="lib/Coordinates.js"></script>
-    <script src="lib/OrbitAndPanControls.js"></script>
-    <script src="lib/TrackballControls.js"></script>
-    <script src="lib/uclass_TeapotGeometry.js"></script>
-    <script src="lib/uclass_TeacupGeometry.js"></script>
-    <script src="lib/uclass_TeaspoonGeometry.js"></script>
-    <script src="lib/uclass_BeveledBlockGeometry.js"></script>
-    <script src="lib/uclass_shaders.js"></script>
     <script src="lib/stats.min.js"></script>
     <script src="lib/dat.gui.min.js"></script>
-    <script src="lib/tween.min.js"></script>
 
-    <!-- Note the additional JS files! always need all of these for postprocessing. -->
-    <script src="js/postprocessing/EffectComposer.js"></script>
-    <script src="js/postprocessing/RenderPass.js"></script>
-    <script src="js/postprocessing/ShaderPass.js"></script>
-    <script src="js/postprocessing/MaskPass.js"></script>
-    <script src="js/shaders/CopyShader.js"></script>
 
-    <!-- separate out the shaders specific to glow effect -->
-    <script src="js/shaders/AdditiveBlendShader.js"></script>
-    <script src="js/shaders/HorizontalBlurShader.js"></script>
-    <script src="js/shaders/VerticalBlurShader.js"></script>
-    <script src="js/postprocessing/BloomPass.js"></script>
-    
     <!-- ---------------- Custom Shader Code ------------------------ -->
     <script id="vertexShader" type="x-shader/x-vertex">
     varying vec2 vUv;
@@ -60,7 +38,7 @@
       vec4 noiseGeneratorTimeShift = texture2D( noiseTexture, uvTimeShift );
       //vec2 uvNoiseTimeShift = vUv + noiseScale * vec2( noiseGeneratorTimeShift.r, noiseGeneratorTimeShift.b );
       vec2 uvNoiseTimeShift = vUv + noiseScale * vec2( noiseGeneratorTimeShift.r, 0 );
-      vec4 baseColor = texture2D( baseTexture, uvNoiseTimeShift );
+      vec4 baseColor = texture2D( baseTexture, uvNoiseTimeShift);
 
       baseColor.a = alpha;
       gl_FragColor = baseColor;

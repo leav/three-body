@@ -20,6 +20,12 @@ THREE.RotationDisplay.prototype.removeMesh = function(mesh){
   this.translationObject.remove(mesh);
 }
 
+THREE.RotationDisplay.prototype.displayMatrix = function(){
+  var matrix = new THREE.Matrix4().copy(this.translationObject.matrix);
+  matrix.multiply(this.matrix);
+  return matrix;
+}
+
 THREE.RotationDisplay.prototype.update = function(delta){
   this.translationObject.position.copy(this.pivot);
   this.translationObject.position.negate();

@@ -96,7 +96,7 @@ function init() {
     randomness: 0.2,
     
 		speed: 50,
-    trail: 300,
+    trail: 5000,
     planetRotation: 0.01,
 	};
   
@@ -125,7 +125,6 @@ function setupGui() {
 var MAX_STAR_MASS = 1000;
 var PLANET_MASS = 0.000;
 
-
 var MAX_STAR_SIZE = 1000;
 var PLANET_SIZE = MAX_STAR_SIZE / 100;
 
@@ -136,6 +135,8 @@ var SPACE_GEOMETRY_RADIUS = MAX_STAR_SIZE * 100;
 var FAR_PLANE = SPACE_GEOMETRY_RADIUS * 2;
 var STELLAR_MAX_DOLLY_DISTANCE = SPACE_GEOMETRY_RADIUS * 0.9;
 var STELLAR_STARTING_POSITION = STELLAR_MAX_DOLLY_DISTANCE / 2;
+
+var STAR_ROTATION = 0.1 * Math.PI / 180;
 
 var GRAVITY_CONSTANT = 10000;
 
@@ -164,10 +165,13 @@ function createStableStarSystem()
   array[3].mass = PLANET_MASS
   array[3].orbitAround(array[2], randRange(planetOrbit * MIN_ORBIT_FACTOR, planetOrbit * MAX_ORBIT_FACTOR), randVector3(-1, 1));
   
-  //array[0].velocity = randVector3(-0.1, 0.1);
-  array[1].velocity.addRandFactor(randomness);
-  array[2].velocity.addRandFactor(randomness);
-  array[3].velocity.addRandFactor(randomness);
+  for (var i = 0; i <= 2; i++) {
+    array[i].rotationSpeed = randRange(-STAR_ROTATION, STAR_ROTATION);
+    array[i].rotationAxis = randVector3(-1, 1);
+  }
+  for (var i = 0; i < array.length; i++) {
+    array[i].velocity.addRandFactor(randomness);
+  }
 
   //log("center mass " + center.toString());
   //log("3rd star " + array[2].toString());
@@ -261,8 +265,7 @@ function initPlanetView()
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// createStarMeshes
-// returns a mesh array for the stars
+// textures and materials
 ////////////////////////////////////////////////////////////////////////////////
 
 var star_texture = THREE.ImageUtils.loadTexture( 'textures/sun01_512.png' );
@@ -287,6 +290,14 @@ var star_material = new THREE.ShaderMaterial(
 var planet_texture = THREE.ImageUtils.loadTexture( "textures/mercury.jpg" );
 var planet_material = new THREE.MeshLambertMaterial( { map: planet_texture } );
 
+var corona_texture = THREE.ImageUtils.loadTexture( "textures/corona.png" );
+var corona_material = new THREE.MeshBasicMaterial( { map: corona_texture, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending} );
+
+////////////////////////////////////////////////////////////////////////////////
+// createStarMeshes
+// returns a mesh array for the stars
+////////////////////////////////////////////////////////////////////////////////
+
 function createStarMesh(star)
 {
    
@@ -301,11 +312,23 @@ function createStarMesh(star)
   var mesh = new THREE.Mesh(
     new THREE.SphereGeometry(radius, 64, 32), material);
   if (star.type == "star") {
-    var light = new THREE.PointLight( 0xFFFFFF, 1, SPACE_GEOMETRY_RADIUS );
+    // randomize rotation
+    mesh.rotation.copy(randVector3(0, Math.PI * 2));
+    // star light
+    var lightColor = 0xFFFFFF;
+    var light = new THREE.PointLight( lightColor, 1, SPACE_GEOMETRY_RADIUS );
     mesh.add(light);
+    // corona
+    // var corona = new THREE.Mesh(new THREE.CircleGeometry(radius * 2, 32), corona_material);
+    // var gyroscope = new THREE.Gyroscope();
+    // gyroscope.add(corona);
+    // mesh.add(gyroscope);
   }
   return mesh;
 }
+
+
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -404,19 +427,20 @@ function updateStars(delta)
 function updateStellarView(delta){
   for (var i = 0; i < starStates.stars.length; i++)
   {
+    // update star mesh
     stellarViewMeshes[i].position.copy(starStates.stars[i].position);
+    stellarViewMeshes[i].rotateOnAxis(starStates.stars[i].rotationAxis, starStates.stars[i].rotationSpeed);
+    // create trail particle
     var pos = new THREE.Vector3();
     pos.copy(starStates.stars[i].position);
     stellarViewTrails[i].geometry.vertices.push(pos);
   }
   hackRefreshStellarViewTrails();
   noiseUniforms.time.value += delta;
-  star_texture.offset.add(new THREE.Vector2(0.005, 0.00) );
-  star_texture.needsUpdate = true;
   stellarDisplay.pivot.copy(centerOfPositions(starStates.stars));
   stellarDisplay.update(delta);
   spaceMesh.position.copy(stellarDisplay.pivot);
-  planetMesh.rotation.y += effectController.planetRotation * Math.PI / 180 * effectController.speed;
+  planetMesh.rotateOnAxis(new THREE.Vector3(0,1,0), effectController.planetRotation * Math.PI / 180 * effectController.speed);
   camera.controls.update(delta);
 }
 
@@ -440,9 +464,12 @@ function hackRefreshStellarViewTrails(){
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// resetStellarViewTrails
+////////////////////////////////////////////////////////////////////////////////
+
 function resetStellarViewTrails(){
   for (var i = 0; i < starStates.stars.length; i++) {
-    // hack to dynamically add particles
     stellarDisplay.removeMesh(stellarViewTrails[i]);
     stellarViewTrails[i] = new THREE.ParticleSystem(new THREE.Geometry(), stellarViewTrails[i].material);
     stellarDisplay.addMesh(stellarViewTrails[i]);
@@ -456,8 +483,6 @@ function resetStellarViewTrails(){
 function updatePlaentView(delta){
   planetCamera.controls.update(delta);
 }
-
-
 
 
 ////////////////////////////////////////////////////////////////////////////////

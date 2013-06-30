@@ -8,8 +8,8 @@ function Star(){
   this.velocity = this.velocity || new THREE.Vector3();
   this.acc = this.acc || new THREE.Vector3();
   this.type = this.type || "star";
-  this.rotation_speed = 0;
-  this.rotation_axis = new THREE.Vector3(0, 0, 1);
+  this.rotationSpeed = 0;
+  this.rotationAxis = new THREE.Vector3(0, 0, 1);
 }
 
 Star.prototype.copy = function(other){
