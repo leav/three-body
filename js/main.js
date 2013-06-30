@@ -136,7 +136,8 @@ var FAR_PLANE = SPACE_GEOMETRY_RADIUS * 2;
 var STELLAR_MAX_DOLLY_DISTANCE = SPACE_GEOMETRY_RADIUS * 0.9;
 var STELLAR_STARTING_POSITION = STELLAR_MAX_DOLLY_DISTANCE / 2;
 
-var STAR_ROTATION = 0.1 * Math.PI / 180;
+var STAR_ROTATION_MAX = 0.05 * Math.PI / 180;
+var STAR_ROTATION_MIN = 0.02 * Math.PI / 180;
 
 var GRAVITY_CONSTANT = 10000;
 
@@ -166,7 +167,7 @@ function createStableStarSystem()
   array[3].orbitAround(array[2], randRange(planetOrbit * MIN_ORBIT_FACTOR, planetOrbit * MAX_ORBIT_FACTOR), randVector3(-1, 1));
   
   for (var i = 0; i <= 2; i++) {
-    array[i].rotationSpeed = randRange(-STAR_ROTATION, STAR_ROTATION);
+    array[i].rotationSpeed = randRange(STAR_ROTATION_MIN, STAR_ROTATION_MAX);
     array[i].rotationAxis = randVector3(-1, 1);
   }
   for (var i = 0; i < array.length; i++) {
@@ -268,31 +269,14 @@ function initPlanetView()
 // textures and materials
 ////////////////////////////////////////////////////////////////////////////////
 
-var star_texture = THREE.ImageUtils.loadTexture( 'textures/sun01_512.png' );
-star_texture.wrapS = THREE.RepeatWrapping;
-star_texture.wrapT = THREE.RepeatWrapping;
-var noiseTexture = new THREE.ImageUtils.loadTexture( 'textures/cloud.png' );
-	noiseTexture.wrapS = noiseTexture.wrapT = THREE.RepeatWrapping; 
-noiseUniforms = {
-		baseTexture: 	{ type: "t", value: star_texture },
-		baseSpeed: 		{ type: "f", value: 0.05 },
-		noiseTexture: 	{ type: "t", value: noiseTexture },
-		noiseScale:		{ type: "f", value: 0.25 },
-		alpha: 			{ type: "f", value: 1.0 },
-		time: 			{ type: "f", value: 1.0 }
-	};
-var star_material = new THREE.ShaderMaterial( 
-	{
-	    uniforms: noiseUniforms,
-		vertexShader:   document.getElementById( 'vertexShader'   ).textContent,
-		fragmentShader: document.getElementById( 'noiseFragmentShader' ).textContent
-	}   );
+
 var planet_texture = THREE.ImageUtils.loadTexture( "textures/mercury.jpg" );
 var planet_material = new THREE.MeshLambertMaterial( { map: planet_texture } );
 
 var corona_texture = THREE.ImageUtils.loadTexture( "textures/corona.png" );
 var corona_material = new THREE.MeshBasicMaterial( { map: corona_texture, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending} );
 
+var STAR_VALUE_RANGE = 0.3;
 ////////////////////////////////////////////////////////////////////////////////
 // createStarMeshes
 // returns a mesh array for the stars
@@ -300,10 +284,12 @@ var corona_material = new THREE.MeshBasicMaterial( { map: corona_texture, transp
 
 function createStarMesh(star)
 {
-   
   if (star.type == "star") {
     var radius = Math.pow(star.mass / MAX_STAR_MASS, 1/3) * MAX_STAR_SIZE;
-    var material = star_material;
+    var material = CreateStarMaterial();
+    var star_color = randRange(STAR_VALUE_RANGE, 1.0);
+    material.uniforms.lightValue.value = star_color;
+    material.uniforms.darkValue.value = star_color - STAR_VALUE_RANGE;
   }
   else {
     var radius = PLANET_SIZE;
@@ -430,13 +416,14 @@ function updateStellarView(delta){
     // update star mesh
     stellarViewMeshes[i].position.copy(starStates.stars[i].position);
     stellarViewMeshes[i].rotateOnAxis(starStates.stars[i].rotationAxis, starStates.stars[i].rotationSpeed);
+    if (starStates.stars[i].type == 'star')
+      stellarViewMeshes[i].material.uniforms.time.value += delta;
     // create trail particle
     var pos = new THREE.Vector3();
     pos.copy(starStates.stars[i].position);
     stellarViewTrails[i].geometry.vertices.push(pos);
   }
   hackRefreshStellarViewTrails();
-  noiseUniforms.time.value += delta;
   stellarDisplay.pivot.copy(centerOfPositions(starStates.stars));
   stellarDisplay.update(delta);
   spaceMesh.position.copy(stellarDisplay.pivot);

@@ -24,24 +24,32 @@
 
     <!-- fragment shader a.k.a. pixel shader -->
     <script id="noiseFragmentShader" type="x-shader/x-vertex"> 
+    // noise randomizing
     uniform sampler2D baseTexture;
-    uniform float baseSpeed;
     uniform sampler2D noiseTexture;
+    uniform float baseSpeed; // speed of changing the sampling on the noise texture
     uniform float noiseScale;
     uniform float alpha;
-    uniform float time;
-
+    uniform float time; // need to update this variable each frame
+    // color ramp sampling
+    uniform sampler2D colorRampTexture;
+    uniform float darkValue; // 0~1, the coordinate on the color ramp for the darkest value
+    uniform float lightValue; // 0~1, the coordinate on the color ramp for the lightest value
+    
     varying vec2 vUv;
     void main() 
     {
       vec2 uvTimeShift = vUv + vec2( -0.7, 1.5 ) * time * baseSpeed;	
       vec4 noiseGeneratorTimeShift = texture2D( noiseTexture, uvTimeShift );
-      //vec2 uvNoiseTimeShift = vUv + noiseScale * vec2( noiseGeneratorTimeShift.r, noiseGeneratorTimeShift.b );
-      vec2 uvNoiseTimeShift = vUv + noiseScale * vec2( noiseGeneratorTimeShift.r, 0 );
-      vec4 baseColor = texture2D( baseTexture, uvNoiseTimeShift);
-
-      baseColor.a = alpha;
-      gl_FragColor = baseColor;
+      vec2 uvNoiseTimeShift = vUv + noiseScale * vec2( noiseGeneratorTimeShift.r, 0 ); // only shift in x direction because of sphere wrapping
+      vec4 grayScale = texture2D( baseTexture, uvNoiseTimeShift);
+      
+      vec4 resultColor = texture2D(colorRampTexture, vec2(darkValue + grayScale.r * (lightValue - darkValue), 0));
+      //vec4 resultColor = texture2D(colorRampTexture, vec2(lightValue, 0));
+      resultColor.a = alpha;
+      
+      //gl_FragColor = vec4(resultColor.r * grayScale.r, resultColor.g * grayScale.r, resultColor.b * grayScale.r, alpha);
+      gl_FragColor = resultColor;
     }  
     </script>
     <!-- ----------------------------------------------------------- -->
@@ -54,6 +62,7 @@
     <script src="js/FreeControls.js"></script>
     <script src="js/RotationDisplay.js"></script>
     <script src="js/AxisIndicator.js"></script>
+    <script src="js/StarMaterial.js"></script>
     <script src="js/main.js"></script>
     
   </body>
