@@ -305,10 +305,11 @@ function createStarMesh(star)
     var light = new THREE.PointLight( lightColor, 1, SPACE_GEOMETRY_RADIUS );
     mesh.add(light);
     // corona
-    // var corona = new THREE.Mesh(new THREE.CircleGeometry(radius * 2, 32), corona_material);
+    var corona = new THREE.Mesh(new THREE.CircleGeometry(radius * 2, 32), corona_material);
     // var gyroscope = new THREE.Gyroscope();
     // gyroscope.add(corona);
-    // mesh.add(gyroscope);
+    mesh.corona = corona;
+    scene.add(corona);
   }
   return mesh;
 }
@@ -411,22 +412,29 @@ function updateStars(delta)
 ////////////////////////////////////////////////////////////////////////////////
 
 function updateStellarView(delta){
+  // update center of camera
+  stellarDisplay.pivot.copy(centerOfPositions(starStates.stars));
+  stellarDisplay.update(delta);
+  // update space sphere
+  spaceMesh.position.copy(stellarDisplay.pivot);
+  // update star mesh
   for (var i = 0; i < starStates.stars.length; i++)
   {
-    // update star mesh
     stellarViewMeshes[i].position.copy(starStates.stars[i].position);
     stellarViewMeshes[i].rotateOnAxis(starStates.stars[i].rotationAxis, starStates.stars[i].rotationSpeed);
     if (starStates.stars[i].type == 'star')
+    {
       stellarViewMeshes[i].material.uniforms.time.value += delta;
+      stellarViewMeshes[i].corona.matrix.identity();
+      stellarViewMeshes[i].corona.applyMatrix(stellarViewMeshes[i].matrixWorld);
+      stellarViewMeshes[i].corona.lookAt(camera.position);
+    }
     // create trail particle
     var pos = new THREE.Vector3();
     pos.copy(starStates.stars[i].position);
     stellarViewTrails[i].geometry.vertices.push(pos);
   }
   hackRefreshStellarViewTrails();
-  stellarDisplay.pivot.copy(centerOfPositions(starStates.stars));
-  stellarDisplay.update(delta);
-  spaceMesh.position.copy(stellarDisplay.pivot);
   planetMesh.rotateOnAxis(new THREE.Vector3(0,1,0), effectController.planetRotation * Math.PI / 180 * effectController.speed);
   camera.controls.update(delta);
 }
