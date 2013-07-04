@@ -4,7 +4,7 @@ var starMaterialNoiseTexture = new THREE.ImageUtils.loadTexture( 'textures/cloud
 starMaterialNoiseTexture.wrapS = starMaterialNoiseTexture.wrapT = THREE.RepeatWrapping; 
 var starMaterialColorRampTexture = new THREE.ImageUtils.loadTexture( 'textures/star_color_modified.png' );  
   
-function CreateStarMaterial(){
+function createStarMaterial(){
   var material = new THREE.ShaderMaterial( 
 	{
     uniforms: {

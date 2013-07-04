@@ -273,9 +273,6 @@ function initPlanetView()
 var planet_texture = THREE.ImageUtils.loadTexture( "textures/mercury.jpg" );
 var planet_material = new THREE.MeshLambertMaterial( { map: planet_texture } );
 
-var corona_texture = THREE.ImageUtils.loadTexture( "textures/corona.png" );
-var corona_material = new THREE.MeshBasicMaterial( { map: corona_texture, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending} );
-
 var STAR_VALUE_RANGE = 0.3;
 ////////////////////////////////////////////////////////////////////////////////
 // createStarMeshes
@@ -286,10 +283,15 @@ function createStarMesh(star)
 {
   if (star.type == "star") {
     var radius = Math.pow(star.mass / MAX_STAR_MASS, 1/3) * MAX_STAR_SIZE;
-    var material = CreateStarMaterial();
+    var material = createStarMaterial();
     var star_color = randRange(STAR_VALUE_RANGE, 1.0);
     material.uniforms.lightValue.value = star_color;
     material.uniforms.darkValue.value = star_color - STAR_VALUE_RANGE;
+    var corona_material = createCoronaMaterial();
+    corona_material.uniforms.colorRampValue.value = star_color;
+    corona_material.uniforms.innerRadius.value = 1 / 1.5;
+    corona_material.uniforms.rotation.value = Math.random();
+    corona_material.uniforms.time.value = Math.random();
   }
   else {
     var radius = PLANET_SIZE;
@@ -305,9 +307,7 @@ function createStarMesh(star)
     var light = new THREE.PointLight( lightColor, 1, SPACE_GEOMETRY_RADIUS );
     mesh.add(light);
     // corona
-    var corona = new THREE.Mesh(new THREE.CircleGeometry(radius * 2, 32), corona_material);
-    // var gyroscope = new THREE.Gyroscope();
-    // gyroscope.add(corona);
+    var corona = new THREE.Mesh(new THREE.CircleGeometry(radius * 1.5, 32), corona_material);
     mesh.corona = corona;
     scene.add(corona);
   }
@@ -373,22 +373,38 @@ function render() {
   
   stats.update();
   
+  mainCamera.controls.enabled = true;
+  sideCamera.controls.enabled = false;
+  camera.controls.update(delta);
+  planetCamera.controls.update(delta);
+  mainCamera.updateProjectionMatrix();
+  sideCamera.updateProjectionMatrix();
+  
   updateStars(delta);
     
   updateStellarView(delta);
   
-  mainCamera.controls.enabled = true;
-  sideCamera.controls.enabled = false;
-  mainCamera.updateProjectionMatrix();
-  sideCamera.updateProjectionMatrix();
-  
 	// main camera render
+  for (var i = 0; i < starStates.stars.length; i++)
+  {
+    if (starStates.stars[i].type == 'star')
+    {
+      stellarViewMeshes[i].corona.lookAt(mainCamera.localToWorld(new THREE.Vector3()));
+    }
+  }
   renderer.enableScissorTest( false );
 	renderer.setViewport( 0, 0, canvasWidth, canvasHeight );
 	renderer.clear();
 	renderer.render( scene, mainCamera );
 
 	// side camera render
+  for (var i = 0; i < starStates.stars.length; i++)
+  {
+    if (starStates.stars[i].type == 'star')
+    {
+      stellarViewMeshes[i].corona.lookAt(sideCamera.localToWorld(new THREE.Vector3()));
+    }
+  }
 	renderer.enableScissorTest( true );
 	renderer.setViewport( 0.75 * canvasWidth, 0,
 		0.25 * canvasWidth, 0.25 * canvasHeight );
@@ -427,7 +443,7 @@ function updateStellarView(delta){
       stellarViewMeshes[i].material.uniforms.time.value += delta;
       stellarViewMeshes[i].corona.matrix.identity();
       stellarViewMeshes[i].corona.applyMatrix(stellarViewMeshes[i].matrixWorld);
-      stellarViewMeshes[i].corona.lookAt(camera.position);
+      stellarViewMeshes[i].corona.material.uniforms.time.value += delta;
     }
     // create trail particle
     var pos = new THREE.Vector3();
@@ -436,7 +452,6 @@ function updateStellarView(delta){
   }
   hackRefreshStellarViewTrails();
   planetMesh.rotateOnAxis(new THREE.Vector3(0,1,0), effectController.planetRotation * Math.PI / 180 * effectController.speed);
-  camera.controls.update(delta);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -476,7 +491,6 @@ function resetStellarViewTrails(){
 ////////////////////////////////////////////////////////////////////////////////
 
 function updatePlaentView(delta){
-  planetCamera.controls.update(delta);
 }
 
 

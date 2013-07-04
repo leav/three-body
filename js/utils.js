@@ -7,6 +7,21 @@
 // rotateOnWorldAxis
 ////////////////////////////////////////////////////////////////////////////////
 
+THREE.Object3D.prototype.currentMatrixWorld = function(){
+  var m = new THREE.Matrix4().copy(this.matrix);
+  var parent;
+  while (parent = this.parent)
+  {
+    m.multiply(parent.matrix);
+  }
+  return m;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// rotateOnWorldAxis
+////////////////////////////////////////////////////////////////////////////////
+
 THREE.Object3D.prototype.rotateOnWorldAxis = function(axis, angle){
   this.matrixWorldNeedsUpdate = true;
   var rotation = new THREE.Matrix4();

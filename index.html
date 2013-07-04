@@ -52,6 +52,39 @@
       gl_FragColor = resultColor;
     }  
     </script>
+    
+    <script id="coronaFragmentShader" type="x-shader/x-vertex"> 
+    // noise randomizing
+    uniform sampler2D noiseTexture;
+    uniform float baseSpeed; // speed of changing the sampling on the noise texture
+    uniform float noiseScale;
+    uniform float time; // need to update this variable each frame
+    // color ramp sampling
+    uniform sampler2D colorRampTexture;
+    uniform float colorRampValue; // 0~1, the coordinate on the color ramp for the corona color
+    // corona attributes
+    uniform float alpha;
+    uniform float innerRadius; // 0~1
+    uniform float rotation; // 0~1
+    
+    varying vec2 vUv;
+    void main() 
+    {
+      float d = distance(vUv, vec2(0.5, 0.5)) * 2.0; // 0~1
+      vec4 color = texture2D(colorRampTexture, vec2(colorRampValue, 0));
+      color.a = alpha;
+      if (d > innerRadius)
+      {
+        vec2 pos = vUv - vec2(0.5, 0.5);
+        float angle = atan(pos.y, pos.x);
+        vec2 noiseUv = vec2( 1.0, 0 ) * time * baseSpeed + vec2(0.0, rotation + angle / 6.28318530718);	
+        vec4 noiseValue = texture2D( noiseTexture, noiseUv );
+        color.a = alpha * (1.0 + (d - innerRadius) / (innerRadius - 1.0) / noiseValue.r);
+      }
+      gl_FragColor = color;
+    }  
+    </script>
+    
     <!-- ----------------------------------------------------------- -->
     
     
@@ -63,6 +96,7 @@
     <script src="js/RotationDisplay.js"></script>
     <script src="js/AxisIndicator.js"></script>
     <script src="js/StarMaterial.js"></script>
+    <script src="js/CoronaMaterial.js"></script>
     <script src="js/main.js"></script>
     
   </body>
