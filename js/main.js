@@ -23,6 +23,8 @@ var planetMesh;
 var stellarViewTrails;
 var planetTrail;
 var spaceMesh;
+var skyMesh;
+var skyOpacity;
 
 // planet view
 
@@ -131,15 +133,21 @@ var PLANET_SIZE = MAX_STAR_SIZE / 100;
 var MIN_ORBIT_FACTOR = 0.8;
 var MAX_ORBIT_FACTOR = 1.2;
 
+var PLANET_CAMERA_POSITION = 1.2;
+
 var SPACE_GEOMETRY_RADIUS = MAX_STAR_SIZE * 100;
+var SKY_GEOMETRY_RADIUS = SPACE_GEOMETRY_RADIUS * 0.9;
 var FAR_PLANE = SPACE_GEOMETRY_RADIUS * 2;
-var STELLAR_MAX_DOLLY_DISTANCE = SPACE_GEOMETRY_RADIUS * 0.9;
+var STELLAR_MAX_DOLLY_DISTANCE = SPACE_GEOMETRY_RADIUS * 0.8;
 var STELLAR_STARTING_POSITION = STELLAR_MAX_DOLLY_DISTANCE / 2;
 
 var STAR_ROTATION_MAX = 0.05 * Math.PI / 180;
 var STAR_ROTATION_MIN = 0.02 * Math.PI / 180;
 
 var GRAVITY_CONSTANT = 10000;
+
+var SKY_MIN_COS = -0.3; // above what angle can we begin to see the sky
+var STAR_BRIGHTEST_DISTANCE_SQ = (MAX_STAR_SIZE * 10) * (MAX_STAR_SIZE * 10);
 
 
 function createStableStarSystem()
@@ -220,6 +228,19 @@ function initStellarView() {
 		});
   spaceMesh = new THREE.Mesh( spaceGeometry, spaceMaterial );
   stellarDisplay.addMesh(spaceMesh);
+  
+  
+  var skyGeometry = new THREE.SphereGeometry(SKY_GEOMETRY_RADIUS, 16, 16);
+  var skyMaterial = new THREE.MeshBasicMaterial({
+			side: THREE.BackSide,
+      transparent: true,
+      opacity: 0.0,
+      map: THREE.ImageUtils.loadTexture( "textures/blue_sky.png"),
+      //color: 0x0000FF,
+		});
+  skyMesh = new THREE.Mesh( skyGeometry, skyMaterial );
+  stellarDisplay.addMesh(skyMesh);
+
 
   
 }
@@ -257,7 +278,7 @@ function initPlanetView()
 {
 	// CAMERA
 	planetCamera = new THREE.PerspectiveCamera( 25, canvasWidth/ canvasHeight, 1, FAR_PLANE );
-	planetCamera.position.set( PLANET_SIZE * 1.2, 0, 0 );
+	planetCamera.position.set( PLANET_SIZE * PLANET_CAMERA_POSITION, 0, 0 );
   planetCamera.rotation.set(0, 30 * Math.PI / 180, -Math.PI / 2);
   planetMesh.add(planetCamera);
   planetCamera.controls = new THREE.FreeControls(planetCamera, renderer.domElement);
@@ -392,6 +413,10 @@ function render() {
       stellarViewMeshes[i].corona.lookAt(mainCamera.localToWorld(new THREE.Vector3()));
     }
   }
+  if (viewState == 'star')
+    skyMesh.material.opacity = 0;
+  else
+    skyMesh.material.opacity = skyOpacity;
   renderer.enableScissorTest( false );
 	renderer.setViewport( 0, 0, canvasWidth, canvasHeight );
 	renderer.clear();
@@ -405,6 +430,10 @@ function render() {
       stellarViewMeshes[i].corona.lookAt(sideCamera.localToWorld(new THREE.Vector3()));
     }
   }
+  if (viewState == 'star')
+    skyMesh.material.opacity = skyOpacity;
+  else
+    skyMesh.material.opacity = 0;
 	renderer.enableScissorTest( true );
 	renderer.setViewport( 0.75 * canvasWidth, 0,
 		0.25 * canvasWidth, 0.25 * canvasHeight );
@@ -431,9 +460,20 @@ function updateStellarView(delta){
   // update center of camera
   stellarDisplay.pivot.copy(centerOfPositions(starStates.stars));
   stellarDisplay.update(delta);
-  // update space sphere
+  // update space and sky sphere
   spaceMesh.position.copy(stellarDisplay.pivot);
+  skyMesh.position.copy(stellarDisplay.pivot);
+  // rotate planet
+  planetMesh.rotateOnAxis(new THREE.Vector3(0,1,0), effectController.planetRotation * Math.PI / 180 * effectController.speed);
   // update star mesh
+  skyOpacity = 0;
+  var starVector = new THREE.Vector3();
+  var starVectorNormal = new THREE.Vector3();
+  var planetVector = new THREE.Vector3().copy(planetCamera.position);
+  var planetRotation = new THREE.Matrix4().extractRotation(planetMesh.matrix);
+  planetVector.applyMatrix4(planetRotation);
+  planetVector.normalize();
+  var dotStarPlanet;
   for (var i = 0; i < starStates.stars.length; i++)
   {
     stellarViewMeshes[i].position.copy(starStates.stars[i].position);
@@ -444,14 +484,21 @@ function updateStellarView(delta){
       stellarViewMeshes[i].corona.matrix.identity();
       stellarViewMeshes[i].corona.applyMatrix(stellarViewMeshes[i].matrixWorld);
       stellarViewMeshes[i].corona.material.uniforms.time.value += delta;
+      starVector.subVectors(stellarViewMeshes[i].position, planetMesh.position);
+      starVectorNormal.copy(starVector);
+      starVectorNormal.normalize();
+      dotStarPlanet = planetVector.dot(starVectorNormal);
+      if (dotStarPlanet > 0)
+        skyOpacity += dotStarPlanet * STAR_BRIGHTEST_DISTANCE_SQ / starVector.lengthSq();
     }
     // create trail particle
     var pos = new THREE.Vector3();
     pos.copy(starStates.stars[i].position);
     stellarViewTrails[i].geometry.vertices.push(pos);
   }
+  // update sky sphere opacity
+  // refresh trails
   hackRefreshStellarViewTrails();
-  planetMesh.rotateOnAxis(new THREE.Vector3(0,1,0), effectController.planetRotation * Math.PI / 180 * effectController.speed);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
