@@ -149,6 +149,9 @@ var GRAVITY_CONSTANT = 10000;
 var SKY_MIN_COS = -0.3; // above what angle can we begin to see the sky
 var STAR_BRIGHTEST_DISTANCE_SQ = (MAX_STAR_SIZE * 10) * (MAX_STAR_SIZE * 10);
 
+var DRINKING_BIRD_SCALE = 0.001;
+var DRINKING_BIRD_POSITION = 1.1;
+
 
 function createStableStarSystem()
 {
@@ -227,6 +230,7 @@ function initStellarView() {
 			side: THREE.BackSide
 		});
   spaceMesh = new THREE.Mesh( spaceGeometry, spaceMaterial );
+  spaceMesh.renderDepth = 1.0;
   stellarDisplay.addMesh(spaceMesh);
   
   
@@ -282,6 +286,17 @@ function initPlanetView()
   planetCamera.rotation.set(0, 30 * Math.PI / 180, -Math.PI / 2);
   planetMesh.add(planetCamera);
   planetCamera.controls = new THREE.FreeControls(planetCamera, renderer.domElement);
+  // drinking bird
+  // var bird = new THREE.Object3D();
+	// createDrinkingBird( bird );
+  // var rotation = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+  // var scale = new THREE.Matrix4().makeScale(DRINKING_BIRD_SCALE, DRINKING_BIRD_SCALE, DRINKING_BIRD_SCALE);
+  // var translation = new THREE.Matrix4().makeTranslation(PLANET_SIZE * DRINKING_BIRD_POSITION, 0, 0);  
+  // bird.applyMatrix(rotation);
+  // bird.applyMatrix(scale);
+  // bird.applyMatrix(translation);
+	// planetMesh.add( bird );
+  // planetMesh.receiveShadow = true; // need to use spot light for star
 }
 
 
@@ -292,8 +307,13 @@ function initPlanetView()
 
 
 var planet_texture = THREE.ImageUtils.loadTexture( "textures/mercury.jpg" );
-var planet_material = new THREE.MeshLambertMaterial( { map: planet_texture } );
+var planet_material = new THREE.MeshLambertMaterial( { map: planet_texture, transparent: true, } );
 
+var textureFlare0 = THREE.ImageUtils.loadTexture( "textures/lensflare/lensflare0.png" );
+var textureFlare2 = THREE.ImageUtils.loadTexture( "textures/lensflare/lensflare2.png" );
+var textureFlare3 = THREE.ImageUtils.loadTexture( "textures/lensflare/lensflare3.png" );
+        
+        
 var STAR_VALUE_RANGE = 0.3;
 ////////////////////////////////////////////////////////////////////////////////
 // createStarMeshes
@@ -331,7 +351,12 @@ function createStarMesh(star)
     var corona = new THREE.Mesh(new THREE.CircleGeometry(radius * 1.5, 32), corona_material);
     mesh.corona = corona;
     scene.add(corona);
+    // lens flare
+    // var lensFlare = new THREE.LensFlare( textureFlare0, 700, SPACE_GEOMETRY_RADIUS, THREE.AdditiveBlending, new THREE.Color( 0xffffff ) );
+    // mesh.lensFlare = lensFlare;
+    // scene.add(lensFlare);
   }
+    
   return mesh;
 }
 
@@ -476,16 +501,22 @@ function updateStellarView(delta){
     stellarViewMeshes[i].rotateOnAxis(starStates.stars[i].rotationAxis, starStates.stars[i].rotationSpeed);
     if (starStates.stars[i].type == 'star')
     {
+      // update lava texture time value
       stellarViewMeshes[i].material.uniforms.time.value += delta;
+      // update corona
       stellarViewMeshes[i].corona.matrix.identity();
       stellarViewMeshes[i].corona.applyMatrix(stellarViewMeshes[i].matrixWorld);
       stellarViewMeshes[i].corona.material.uniforms.time.value += delta;
+      // calculate sky opacity
       starVector.subVectors(stellarViewMeshes[i].position, planetMesh.position);
       starVectorNormal.copy(starVector);
       starVectorNormal.normalize();
       dotStarPlanet = planetVector.dot(starVectorNormal);
       if (dotStarPlanet > 0)
         skyOpacity += dotStarPlanet * STAR_BRIGHTEST_DISTANCE_SQ / starVector.lengthSq();
+      // update lensFlare
+      // stellarViewMeshes[i].lensFlare.matrix.identity();
+      // stellarViewMeshes[i].lensFlare.applyMatrix(stellarViewMeshes[i].matrixWorld);
     }
     // create trail particle
     var pos = new THREE.Vector3();
