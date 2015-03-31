@@ -1,11 +1,5 @@
 # Three Body
 
-## Links
-
-[demo](http://leav.github.io/three-body/)
-
-[source](https://github.com/leav/three-body)
-
 ## Description
 
 This project idea is from the science fiction [*Three Body*][1]. In this simulation, a planet is orbiting around a [triple star system][2], where the planet has three suns. Because of the unpredictable nature of the three body system, chaos things happen, such as one of the sun getting ejected off, or the planet being consumed by the suns.
