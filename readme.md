@@ -1,7 +1,7 @@
 # Three Body
 
 ## Launch in Browser
-leav.github.io/three-body/
+https://leav.github.io/three-body/
 
 ## Description
 
